@@ -50,7 +50,7 @@ const getNav = (user = null) => {
             <li class="nav_link_container" id="nav_home">
                 <a href="/" class="nav_links" id="home_link">
                     <svg id="home_svg" width="45px" height="45px">
-                        <image width="45px" height="45px" href="/images/logo_stellaview.svg" alt="StellaView: Watch the stars"></image>
+                        <image width="45px" height="45px" href="/images/logo_echo_domain.svg" alt="Echo Domain: Visualize the World through Sound"></image>
                     </svg>
                 </a>
             </li>
