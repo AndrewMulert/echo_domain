@@ -16,7 +16,7 @@ export function createEchoModel() {
 
     model.add(tf.layers.dense({
         units: 128,
-        inputShape: [4106],
+        inputShape: [4108],
         activation: 'relu'
     }));
 
@@ -41,6 +41,15 @@ export async function predictWithEchoBrain(model, scanData) {
     return tf.tidy(() => {
         const normalize = (val) => Math.max(0, Math.min(1, (val + 100) / 70));
 
+        const findPeak = (arr) => {
+            let max = -Infinity;
+            let index = 0;
+            for(let i=0; i<arr.length; i++) {
+                if(arr[i] > max) { max = arr[i]; index = i; }
+            }
+            return index / arr.length;
+        }
+
         const leftAudio = Array.from(scanData.leftSnapshot).map(normalize);
         const rightAudio = Array.from(scanData.rightSnapshot).map(normalize)
 
@@ -57,17 +66,19 @@ export async function predictWithEchoBrain(model, scanData) {
             scanData.meta.delay / 100,
             scanData.meta.freq / 20000,
             scanData.meta.volume || 0,
-            (scanData.stereoYawOffset || 0) / 45
+            (scanData.stereoYawOffset || 0) / 45,
+            findPeak(scanData.leftSnapshot),
+            findPeak(scanData.rightSnapshot)
         ];
 
         const combinedInput = [...leftAudio, ...rightAudio, ...motionInput, ...metaInput];
 
-        if (combinedInput.length !== 4106) {
-            console.error(`Input shape error! Expected 4106, got ${combinedInput.length}. L:${leftAudio.length} R:${rightAudio.length}`);
+        if (combinedInput.length !== 4108) {
+            console.error(`Input shape error! Expected 4108, got ${combinedInput.length}. L:${leftAudio.length} R:${rightAudio.length}`);
             return 0;
         }
 
-        const inputTensor = tf.tensor2d([combinedInput], [1, 4106]);
+        const inputTensor = tf.tensor2d([combinedInput], [1, 4108]);
         const prediction = model.predict(inputTensor);
 
         return prediction.dataSync()[0];

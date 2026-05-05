@@ -16,9 +16,22 @@ export async function uploadCalibrationData(scanData, actualDistance) {
     };
 
     const normalize = (val) => Math.max(0, Math.min(1, (val + 100) / 70));
+
+    const findPeak = (arr) => {
+        let max = -Infinity;
+        let index = 0;
+        for(let i=0; i<arr.length; i++) {
+            if(arr[i] > max) { max = arr[i]; index = i; }
+        }
+        return index / arr.length;
+    }
+
+    const leftPeak = findPeak(scanData.leftSnapshot);
+    const rightPeak = findPeak(scanData.rightSnapshot);
+
     const normalizedInput = [
-        ...leftAudio.map(normalize),
-        ...rightAudio.map(normalize),
+        ...Array.from(scanData.leftSnapshot).map(normalize),
+        ...Array.from(scanData.rightSnapshot).map(normalize),
         scanData.orientation.pitch || 0,
         scanData.orientation.yaw || 0,
         scanData.orientation.roll || 0,
@@ -28,7 +41,9 @@ export async function uploadCalibrationData(scanData, actualDistance) {
         (scanData.meta.delay || 0) / 100,
         (scanData.meta.freq || 0) / 20000,
         scanData.meta.volume || 0,
-        (scanData.stereoYawOffset || 0) / 45
+        (scanData.stereoYawOffset || 0) / 45,
+        leftPeak,
+        rightPeak
     ];
 
     await fetch('/api/upload-calibration', {

@@ -3,6 +3,11 @@ let relativePosition = { x: 0, y: 0, z: 0 };
 let currentOrientation = { pitch: 0, yaw: 0, roll: 0 };
 let isInitialized = false;
 
+/**
+ * @param {string} base64Data - The scanData.visualSnapshot string
+ * @returns {Promise<{r:number, g:number, b:number}>}
+ */
+
 export async function initSensors() {
     if (isInitialized) return { stream };
 
@@ -12,6 +17,9 @@ export async function initSensors() {
             echoCancellation: false,
             noiseSuppression: false,
             autoGainControl: false,
+            googEchoCancellation: false,
+            googAutoGainControl: false,
+            googNoiseSuppression: false,
             sampleRate: 44100
         },
         video: { facingMode: "environment" }
@@ -79,7 +87,7 @@ export async function startEcholocation() {
             leftAnalyzer.getFloatTimeDomainData(leftWave);
             rightAnalyzer.getFloatTimeDomainData(rightWave);
 
-            const stereoYawOffset = calculateTimeDifference(leftWave, rightWave);
+            const stereoYawOffset = calculateEnhancedTimeDifference(leftWave, rightWave);
 
             const scanData = {
                 timestamp: Date.now(),
@@ -137,15 +145,18 @@ function playChirp(ctx) {
     return { startFreq, endFreq, duration, volume: outputLevel };
 }
 
-function calculateTimeDifference(left, right) {
+function calculateEnhancedTimeDifference(left, right) {
     let maxCorr = -Infinity;
     let bestShift = 0;
-    const windowSize = 20;
+    const windowSize = 30;
+
+    const leftRMS = Math.sqrt(left.reduce((acc, v) => acc + v*v, 0) / left.length);
+    const rightRMS = Math.sqrt(right.reduce((acc, v) => acc + v*v, 0) / right.length);
 
     for (let shift = -windowSize; shift <= windowSize; shift++) {
         let corr = 0;
         for (let i = windowSize; i < left.length - windowSize; i++) {
-            corr += left[i] * right[i + shift];
+            corr += (left[i] / (leftRMS || 1)) * (right[i + shift] / (rightRMS || 1));
         }
         if (corr > maxCorr) {
             maxCorr = corr;
@@ -153,5 +164,24 @@ function calculateTimeDifference(left, right) {
         }
     }
 
-    return (bestShift / windowSize) * 45;
+    return (bestShift / windowSize) * 60;
+}
+
+export async function extractColorFromSnapshot(base64Data) {
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+            const scratchCanvas = document.createElement('canvas');
+            scratchCanvas.width = 1;
+            scratchCanvas.height = 1;
+            const sCtx = scratchCanvas.getContext('2d');
+
+            sCtx.drawImage(img, 64, 64, 1, 1, 0, 0, 1, 1);
+            const p = sCtx.getImageData(0, 0, 1, 1).data;
+
+            resolve({ r: p[0], g: p[1], b: p[2] });
+        };
+        img.onerror = () => resolve({ r: 120, g: 120, b: 120 });
+        img.src = base64Data;
+    })
 }
