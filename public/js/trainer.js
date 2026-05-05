@@ -38,10 +38,10 @@ export async function uploadCalibrationData(scanData, actualDistance) {
         scanData.position.x || 0,
         scanData.position.y || 0,
         scanData.position.z || 0,
-        (scanData.meta.delay || 0) / 100,
-        (scanData.meta.freq || 0) / 20000,
+        (scanData.meta.delay || 0) / 200,
+        (scanData.meta.freq || 0) / 22000,
         scanData.meta.volume || 0,
-        (scanData.stereoYawOffset || 0) / 45,
+        (scanData.stereoYawOffset || 0) / 60,
         leftPeak,
         rightPeak
     ];

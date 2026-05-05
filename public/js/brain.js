@@ -15,8 +15,13 @@ export function createEchoModel() {
     const model = tf.sequential();
 
     model.add(tf.layers.dense({
+        units: 256,
+        inputShape: [8204],
+        activation: 'relu'
+    }));
+
+    model.add(tf.layers.dense({
         units: 128,
-        inputShape: [4108],
         activation: 'relu'
     }));
 
@@ -28,7 +33,7 @@ export function createEchoModel() {
     model.add(tf.layers.dense({ units: 1 }));
 
     model.compile({
-        optimizer: tf.train.adam(0.001),
+        optimizer: tf.train.adam(0.0005),
         loss: 'meanSquaredError'
     });
 
@@ -63,22 +68,22 @@ export async function predictWithEchoBrain(model, scanData) {
         ];
 
         const metaInput = [
-            scanData.meta.delay / 100,
+            scanData.meta.delay / 200,
             scanData.meta.freq / 20000,
             scanData.meta.volume || 0,
-            (scanData.stereoYawOffset || 0) / 45,
+            (scanData.stereoYawOffset || 0) / 60,
             findPeak(scanData.leftSnapshot),
             findPeak(scanData.rightSnapshot)
         ];
 
         const combinedInput = [...leftAudio, ...rightAudio, ...motionInput, ...metaInput];
 
-        if (combinedInput.length !== 4108) {
-            console.error(`Input shape error! Expected 4108, got ${combinedInput.length}. L:${leftAudio.length} R:${rightAudio.length}`);
+        if (combinedInput.length !== 8204) {
+            console.error(`Input shape error! Expected 8204, got ${combinedInput.length}. L:${leftAudio.length} R:${rightAudio.length}`);
             return 0;
         }
 
-        const inputTensor = tf.tensor2d([combinedInput], [1, 4108]);
+        const inputTensor = tf.tensor2d([combinedInput], [1, 8204]);
         const prediction = model.predict(inputTensor);
 
         return prediction.dataSync()[0];
@@ -90,7 +95,7 @@ export async function trainEchoBrain(model, trainingData, onProgress) {
     const outputs = tf.tensor2d(trainingData.map(d => d.output));
 
     await model.fit(inputs, outputs, {
-        epochs: 50,
+        epochs: 60,
         batchSize: 32,
         callbacks: {
             onEpochEnd: (epoch, logs) => {

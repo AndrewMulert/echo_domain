@@ -36,11 +36,17 @@ function stopHardware() {
 }
 
 let sweepCounter = 0;
-let currentPitch = -15;
+let currentPitch = -20;
 let pitchDirection = 1;
-const PITCH_STEP = 2;
-const MAX_PITCH = 25;
-const SWEEP_AMPLITUDE = 60;
+const PITCH_STEP = 3;
+const MAX_PITCH = 45;
+const SWEEP_AMPLITUDE = 90;
+
+function isValidPoint(distance, scanData) {
+    if (distance <= 0.05 || distance > 15) return false;
+    if (scanData.meta.leftPeak < 0.01 && scanData.meta.rightPeak < 0.01) return false;
+    return true;
+}
 
 async function runMachineGun() {
     while (isScanning) {
@@ -61,22 +67,29 @@ async function runMachineGun() {
             }
 
             const rawDistance = await predictWithEchoBrain(echoModel, scanData);
-            const distance = Math.max(0.1, Math.abs(rawDistance));
+            const distance = Math.abs(rawDistance);
 
-            sweepCounter += 0.15;
-            const virtualSweep = Math.sin(sweepCounter) * SWEEP_AMPLITUDE;
-
-            if (Math.abs(virtualSweep) > (SWEEP_AMPLITUDE - 1)) {
-                currentPitch += (PITCH_STEP * pitchDirection);
-                if (currentPitch >= MAX_PITCH || currentPitch <= -MAX_PITCH) {
-                    pitchDirection *= -1;
-                }
+            if (distance < 0.6) {
+                console.log("Initial Close Point (User/Obstacle) detected.");
+            } else if (distance > 3.0) {
+                console.log("Far Point (Wall/Boundary) detected.");
             }
+
+            const left = scanData.meta?.leftPeak || 0;
+            const right = scanData.meta?.rightPeak || 0;
+
+            const stereoDiff = left - right;
+            const acousticYawShift = stereoDiff * 45;
+
+            const subtleOscillation = Math.sin(sweepCounter) * 10;
+            const finalYaw = (scanData.orientation?.yaw || 0) +
+                            (Number.isNaN(acousticYawShift) ? 0 : acousticYawShift) +
+                            subtleOscillation;
 
             const adjustedOrientation = {
                 ...scanData.orientation,
-                yaw: scanData.orientation.yaw + (scanData.stereoYawOffset || 0) + virtualSweep,
-                pitch: scanData.orientation.pitch + currentPitch
+                yaw:finalYaw,
+                pitch: (scanData.orientation?.pitch || 0) + currentPitch
             };
 
             const hue = (distance / 5) * 240;
@@ -97,12 +110,21 @@ async function runMachineGun() {
             
             console.log(logMsg);
 
-            addPoint(distance, adjustedOrientation, scanData.position, pointColor);
-            updateCloud();
+            if (isValidPoint(distance, scanData)) {
+                addPoint(distance, adjustedOrientation, scanData.position, pointColor);
+                updateCloud();
+            }
 
-            console.log(`📡 Ping: ${distance.toFixed(2)}m | Sweep: ${virtualSweep.toFixed(1)}° | Yaw: ${adjustedOrientation.yaw.toFixed(1)}° | Delay: ${scanData.meta.delay.toFixed(0)}ms`);
+            console.log(`📡 Ping: ${distance.toFixed(2)}m | Acoustic Shift: ${acousticYawShift.toFixed(1)}° | Yaw: ${adjustedOrientation.yaw.toFixed(1)}° | Delay: ${scanData.meta.delay.toFixed(0)}ms`);
 
-            await new Promise(resolve => setTimeout(resolve, 40));
+            currentPitch += (PITCH_STEP * pitchDirection);
+
+            if (currentPitch >= MAX_PITCH || currentPitch <= -MAX_PITCH) {
+                pitchDirection *= -1;
+            }
+
+            sweepCounter += 0.15;
+            await new Promise(resolve => setTimeout(resolve, 80));
         } catch (err) {
             console.error("Ping error:", err);
             toggleScanning(false);
@@ -121,14 +143,14 @@ async function performSyntheticTraining(model) {
     console.log("Generating synthetic training data...");
     const trainingSet = [];
 
-    for (let i = 0; i < 500; i++) {
-        const dist = 0.5 + (Math.random() * 4.5);
-        const leftScan = generateSyntheticScan(dist);
-        const rightScan = generateSyntheticScan(dist);
+    for (let i = 0; i < 600; i++) {
+        const dist = 0.1 + (Math.random() * 11.9);
+        const leftScan = generateSyntheticScan(dist, 4096);
+        const rightScan = generateSyntheticScan(dist, 4096);
 
-        const simDelay = 40 + Math.random() * 60;
-        const simFreq = 14000 + Math.random() * 6000;
-        const simVol = 0.2;
+        const simDelay = 40 + Math.random() * 160;
+        const simFreq = 16000 + Math.random() * 5000;
+        const simVol = 0.3;
         const simStereoOffset = (Math.random() * 2 - 1);
 
         const simLeftPeak = Math.random();
@@ -138,8 +160,11 @@ async function performSyntheticTraining(model) {
             input: [
                 ...Array.from(leftScan.audioSnapshot), 
                 ...Array.from(rightScan.audioSnapshot), 
-                ...[0,0,0,0,0,0],
-                ...[simDelay / 100, simFreq / 20000, simVol, simStereoOffset],
+                0,0,0,0,0,0,
+                simDelay / 200, 
+                simFreq / 22000, 
+                simVol, 
+                simStereoOffset / 60,
                 simLeftPeak,
                 simRightPeak
             ],

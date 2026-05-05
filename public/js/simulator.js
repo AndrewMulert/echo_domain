@@ -1,16 +1,20 @@
-export function generateSyntheticScan(targetDistance) {
-    const fftSize = 2048;
-    const audioSnapshot = new Float32Array(fftSize).fill(-100);
+/**
+ * @param {number} targetDistance - The distance to simulate in meters.
+ * @param {number} numBins - The number of frequency bins (4096 for 8192 FFT).
+ */
+
+export function generateSyntheticScan(targetDistance, numBins = 4096) {
+    const audioSnapshot = new Float32Array(numBins).fill(-100);
 
     const speedOfSound = 343;
     const roundTripTime = (targetDistance * 2) / speedOfSound;
-    const targetBin = Math.floor(roundTripTime * 44100 / (4096 / fftSize));
+    const targetBin = Math.floor(roundTripTime * 44100 / (8192 / numBins));
 
-    if (targetBin < fftSize) {
+    if (targetBin < numBins) {
         audioSnapshot[targetBin] = -30;
     }
 
-    for (let i = 0; i < fftSize; i++) {
+    for (let i = 0; i < numBins; i++) {
         audioSnapshot[i] += (Math.random() * 10);
     }
 
