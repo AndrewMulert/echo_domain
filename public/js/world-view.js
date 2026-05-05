@@ -1,10 +1,10 @@
-import * as THREE from 'three';
-import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter';
+import * as THREE from 'https://esm.sh/three@0.150.1';
+import { GLTFExporter } from 'https://esm.sh/three@0.150.1/examples/jsm/exporters/GLTFExporter.js';
 
 let scene, camera, renderer, pointsGeometry;
 let pointsBufferGeometry = new THREE.BufferGeometry();
-let pointsMaterial = new THREE.PointsMaterial({ size: 0.05, vertexColors: true });
-let cloud = new THREE.Points(pointsBufferGeometry, pointsMaterial);
+let pointsMaterial = new THREE.PointsMaterial({ size: 0.1, vertexColors: true });
+let cloud;
 const positions = [];
 const colors = [];
 
@@ -14,28 +14,35 @@ export function initScene(containerElement) {
     renderer = new THREE.WebGLRenderer({ antialias: true });
 
     renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setClearColor(0x111111, 1);
     containerElement.appendChild(renderer.domElement);
 
     const grid = new THREE.GridHelper(10, 10);
     scene.add(grid);
 
+    pointsBufferGeometry = new THREE.BufferGeometry();
+    cloud = new THREE.Points(pointsBufferGeometry, pointsMaterial);
     scene.add(cloud);
 
-    camera.position.z = 5;
+    camera.position.set(0, 2, 5);
+    camera.lookAt(0, 0, 0);
+
     animate();
 }
 
 export function addPoint(distance, orientation, position, colorRGB) {
-    const pitch = orientation.pitch * (Math.PI / 180);
-    const yaw = orientation.yaw * (Math.PI / 180);
+    const vector = new THREE.Vector3(0, 0, -Math.max(0.1, distance));
 
-    const lx = distance * Math.cos(pitch) * Math.sin(yaw);
-    const ly = distance * Math.sin(pitch);
-    const lz = distance * Math.cos(pitch) * Math.cos(yaw);
+    const yaw = THREE.MathUtils.degToRad(orientation.yaw || 0);
+    const pitch = THREE.MathUtils.degToRad(orientation.pitch || 0);
+    const roll = THREE.MathUtils.degToRad(orientation.roll || 0);
 
-    const finalX = lx + position.x;
-    const finalY = ly + position.y;
-    const finalZ = lz + position.z;
+    const euler = new THREE.Euler(pitch, yaw, roll, 'YXZ');
+    vector.applyEuler(euler);
+
+    const finalX = vector.x + (position.x || 0);
+    const finalY = vector.y + (position.y || 0);
+    const finalZ = vector.z + (position.z || 0);
 
     positions.push(finalX, finalY, finalZ);
     colors.push(colorRGB.r / 255, colorRGB.g / 255, colorRGB.b / 255);

@@ -16,8 +16,7 @@ router.get('/', async (req, res, next) => {
             description: 'Build realistic 3D Models of an environment using an AI Algorithm with the data gathered by your microphone, speakers, camera, and gyroscope on device.',
             content: 'echo location, echo, location, visual, virtual, world building, virtual world, cameras, view, 3D model, echolocation, microphone, speaker, high frequency',
             scripts: [
-                '<script src="/js/main.js" type="module"></script>',
-                '<script src="/js/map.js" type="module"></script>'
+                '<script src="/js/main.js" type="module"></script>'
             ]
         });
     } catch (err) {

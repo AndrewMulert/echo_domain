@@ -15,17 +15,17 @@ export function createEchoModel() {
     const model = tf.sequential();
 
     model.add(tf.layers.dense({
-        units: 64,
-        inputShape: [2054],
+        units: 128,
+        inputShape: [4106],
         activation: 'relu'
     }));
 
     model.add(tf.layers.dense({
-        units: 32,
+        units: 64,
         activation: 'relu'
     }));
 
-    model.add(tf.layers.dense({ units: 1}));
+    model.add(tf.layers.dense({ units: 1 }));
 
     model.compile({
         optimizer: tf.train.adam(0.001),
@@ -36,10 +36,14 @@ export function createEchoModel() {
 }
 
 export async function predictWithEchoBrain(model, scanData) {
-    if (!scanData || !scanData.audioSnapshot) return 0;
+    if (!scanData || !scanData.leftSnapshot || !scanData.rightSnapshot) return 0;
     
     return tf.tidy(() => {
-        const audioInput = Array.from(scanData.audioSnapshot);
+        const normalize = (val) => Math.max(0, Math.min(1, (val + 100) / 70));
+
+        const leftAudio = Array.from(scanData.leftSnapshot).map(normalize);
+        const rightAudio = Array.from(scanData.rightSnapshot).map(normalize)
+
         const motionInput = [
             scanData.orientation.pitch || 0,
             scanData.orientation.yaw || 0,
@@ -49,9 +53,21 @@ export async function predictWithEchoBrain(model, scanData) {
             scanData.position.z || 0
         ];
 
-        const combinedInput = [...audioInput, ...motionInput];
+        const metaInput = [
+            scanData.meta.delay / 100,
+            scanData.meta.freq / 20000,
+            scanData.meta.volume || 0,
+            (scanData.stereoYawOffset || 0) / 45
+        ];
 
-        const inputTensor = tf.tensor2d([combinedInput]);
+        const combinedInput = [...leftAudio, ...rightAudio, ...motionInput, ...metaInput];
+
+        if (combinedInput.length !== 4106) {
+            console.error(`Input shape error! Expected 4106, got ${combinedInput.length}. L:${leftAudio.length} R:${rightAudio.length}`);
+            return 0;
+        }
+
+        const inputTensor = tf.tensor2d([combinedInput], [1, 4106]);
         const prediction = model.predict(inputTensor);
 
         return prediction.dataSync()[0];
